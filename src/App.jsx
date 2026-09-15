@@ -2,13 +2,10 @@ import React, { useState } from 'react';
 import LandingPage from './pages/LandingPage';
 import WizardApp from './pages/WizardApp';
 import AuthModal from './components/AuthModal';
-<<<<<<< HEAD
 import { calculateSystemSizing } from './services/sizingApi';
-=======
->>>>>>> origin/main
 
 export default function App() {
-  const [view, setView] = useState('landing'); // 'landing' | 'wizard'
+  const [view, setView] = useState('landing');
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [user, setUser] = useState(() => {
     try {
@@ -19,20 +16,16 @@ export default function App() {
   });
   const [token, setToken] = useState(() => localStorage.getItem('savjal_token') || null);
 
-<<<<<<< HEAD
-  // Global handler for your sizing backend calculations
   const handleCalculateSizing = async (formData) => {
     try {
       const data = await calculateSystemSizing(formData);
-      return data; // Returns { hydrology, sizing, costEstimation }
+      return data;
     } catch (error) {
       console.error('Sizing calculation failed:', error);
       throw error;
     }
   };
 
-=======
->>>>>>> origin/main
   const handleOpenAuth = () => {
     setIsAuthOpen(true);
   };
@@ -80,14 +73,10 @@ export default function App() {
           user={user}
           token={token}
           onLogout={handleLogout}
-<<<<<<< HEAD
           onCalculateSizing={handleCalculateSizing}
-=======
->>>>>>> origin/main
         />
       )}
 
-      {/* Auth Modal Screen */}
       <AuthModal
         isOpen={isAuthOpen}
         onClose={handleCloseAuth}
@@ -95,9 +84,4 @@ export default function App() {
       />
     </div>
   );
-<<<<<<< HEAD
 }
-=======
-}
-
->>>>>>> origin/main
