@@ -2,7 +2,10 @@ import React, { useState } from 'react';
 import LandingPage from './pages/LandingPage';
 import WizardApp from './pages/WizardApp';
 import AuthModal from './components/AuthModal';
+<<<<<<< HEAD
 import { calculateSystemSizing } from './services/sizingApi';
+=======
+>>>>>>> origin/main
 
 export default function App() {
   const [view, setView] = useState('landing'); // 'landing' | 'wizard'
@@ -16,6 +19,7 @@ export default function App() {
   });
   const [token, setToken] = useState(() => localStorage.getItem('savjal_token') || null);
 
+<<<<<<< HEAD
   // Global handler for your sizing backend calculations
   const handleCalculateSizing = async (formData) => {
     try {
@@ -27,6 +31,8 @@ export default function App() {
     }
   };
 
+=======
+>>>>>>> origin/main
   const handleOpenAuth = () => {
     setIsAuthOpen(true);
   };
@@ -74,7 +80,10 @@ export default function App() {
           user={user}
           token={token}
           onLogout={handleLogout}
+<<<<<<< HEAD
           onCalculateSizing={handleCalculateSizing}
+=======
+>>>>>>> origin/main
         />
       )}
 
@@ -86,4 +95,9 @@ export default function App() {
       />
     </div>
   );
+<<<<<<< HEAD
 }
+=======
+}
+
+>>>>>>> origin/main
