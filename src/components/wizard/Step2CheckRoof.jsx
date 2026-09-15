@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldAlert, CloudRain, Users, ArrowRight, ArrowLeft, AlertTriangle, CheckCircle2, Info } from 'lucide-react';
+import { ShieldAlert, CloudRain, Users, ArrowRight, ArrowLeft, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { calculateHydrology } from '../../utils/hydrologicalEngine';
 
 export default function Step2CheckRoof({ wizardData, updateWizardData, onNext, onPrev }) {
@@ -16,7 +16,7 @@ export default function Step2CheckRoof({ wizardData, updateWizardData, onNext, o
   ];
 
   const currentArea = wizardData.roofArea || 145;
-  const currentRainfall = wizardData.rainfall || 950;
+  const currentRainfall = wizardData.annualRainfall || wizardData.rainfall || 950;
   const currentCoeff = wizardData.runoffCoeff || 0.85;
   const currentSoil = wizardData.soilType || 'Loamy';
   const currentMembers = wizardData.householdMembers || 4;
@@ -42,7 +42,7 @@ export default function Step2CheckRoof({ wizardData, updateWizardData, onNext, o
         </div>
       </div>
 
-      {/* Safety Alert Banner (GIS Member 4 Safety Engine Rule) */}
+      {/* Safety Alert Banner */}
       {hydro.safetyAlert && (
         <div className={`p-4 rounded-2xl border flex items-start gap-3 transition-all ${
           hydro.safetyAlert.type === 'warning'
@@ -116,12 +116,12 @@ export default function Step2CheckRoof({ wizardData, updateWizardData, onNext, o
                 max="2500"
                 step="25"
                 value={currentRainfall}
-                onChange={(e) => updateWizardData({ rainfall: Number(e.target.value) })}
+                onChange={(e) => updateWizardData({ annualRainfall: Number(e.target.value), rainfall: Number(e.target.value) })}
                 className="w-full h-2 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-sky-400"
               />
               <div className="flex justify-between text-[10px] text-slate-500 mt-1 font-mono">
                 <span>400 mm (Arid)</span>
-                <span>950 mm (Jaipur Avg)</span>
+                <span>950 mm (Avg)</span>
                 <span>2500 mm (Monsoon)</span>
               </div>
             </div>
@@ -214,7 +214,7 @@ export default function Step2CheckRoof({ wizardData, updateWizardData, onNext, o
               <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-sky-400 to-emerald-400 rounded-full transition-all duration-500"
-                  style={{ width: `${hydro.selfSufficiencyPct}%` }}
+                  style={{ width: `${Math.min(hydro.selfSufficiencyPct, 100)}%` }}
                 ></div>
               </div>
               <p className="text-[10px] text-slate-400">

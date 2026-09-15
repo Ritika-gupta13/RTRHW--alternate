@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Polygon, Marker, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { MapPin, Trash2, ArrowRight, MousePointerClick, CheckCircle } from 'lucide-react';
+import { MapPin, Trash2, ArrowRight, MousePointerClick, CheckCircle, Navigation, Search } from 'lucide-react';
 import { calculatePolygonArea } from '../../utils/geoCalculations';
 
 delete L.Icon.Default.prototype._getIconUrl;
@@ -42,6 +42,8 @@ export default function Step1FindHouse({ wizardData, updateWizardData, onNext })
   const [tileMode, setTileMode] = useState('satellite');
   const [searchQuery, setSearchQuery] = useState(wizardData.address || 'Jaipur, Rajasthan');
   const [computedArea, setComputedArea] = useState(wizardData.roofArea || 145);
+  const [isGisLoading, setIsGisLoading] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
 
   const presetLocations = [
     { name: 'Jaipur, RJ', coords: [26.9124, 75.7873] },
@@ -49,6 +51,87 @@ export default function Step1FindHouse({ wizardData, updateWizardData, onNext })
     { name: 'Bengaluru, KA', coords: [12.9716, 77.5946] },
     { name: 'Mumbai, MH', coords: [19.0760, 72.8777] }
   ];
+
+  // Fetch GIS dynamic rainfall & soil data from Port 5003 service
+  const fetchGisData = async (lat, lng) => {
+    setIsGisLoading(true);
+    try {
+      const response = await fetch('http://localhost:5003/api/gis/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ latitude: lat, longitude: lng })
+      });
+      const data = await response.json();
+      if (data.status === 'success') {
+        updateWizardData({
+          annualRainfall: data.environmentalData.annualRainfallMm,
+          soilType: data.environmentalData.soilType || 'Loamy Soil',
+          latitude: lat,
+          longitude: lng
+        });
+      }
+    } catch (err) {
+      console.error('GIS Backend fetch error:', err);
+    } finally {
+      setIsGisLoading(false);
+    }
+  };
+
+  const updateMapAndPolygon = (coords, labelName) => {
+    setMapCenter(coords);
+    const [lat, lng] = coords;
+    const offset = 0.0003;
+    const newPoly = [
+      [lat, lng],
+      [lat + offset, lng + offset],
+      [lat + offset * 0.4, lng + offset * 1.4],
+      [lat - offset * 0.6, lng + offset * 0.4]
+    ];
+    setPolygonPoints(newPoly);
+    updateWizardData({ address: labelName, mapCenter: coords });
+    fetchGisData(lat, lng);
+  };
+
+  // 1. Manual Address Search (Nominatim Geocoding)
+  const handleSearchSubmit = async (e) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+    setIsSearching(true);
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}`);
+      const data = await res.json();
+      if (data && data.length > 0) {
+        const lat = parseFloat(data[0].lat);
+        const lon = parseFloat(data[0].lon);
+        updateMapAndPolygon([lat, lon], data[0].display_name);
+      } else {
+        alert('Location not found. Please enter another location.');
+      }
+    } catch (err) {
+      console.error('Search error:', err);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // 2. Browser GPS Geolocation
+  const handleUseGPS = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser.');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        setSearchQuery(`GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+        updateMapAndPolygon([lat, lng], 'Current GPS Location');
+      },
+      (error) => {
+        alert('Unable to retrieve GPS location. Check browser permissions.');
+      }
+    );
+  };
 
   useEffect(() => {
     if (polygonPoints.length >= 3) {
@@ -64,22 +147,14 @@ export default function Step1FindHouse({ wizardData, updateWizardData, onNext })
   };
 
   const handleSelectPreset = (loc) => {
-    setMapCenter(loc.coords);
     setSearchQuery(loc.name);
-    const [lat, lng] = loc.coords;
-    const offset = 0.0003;
-    const newPoly = [
-      [lat, lng],
-      [lat + offset, lng + offset],
-      [lat + offset * 0.4, lng + offset * 1.4],
-      [lat - offset * 0.6, lng + offset * 0.4]
-    ];
-    setPolygonPoints(newPoly);
-    updateWizardData({ address: loc.name, mapCenter: loc.coords });
+    updateMapAndPolygon(loc.coords, loc.name);
   };
 
-  const handleConfirmNext = () => {
+  const handleConfirmNext = async () => {
     const finalArea = computedArea > 0 ? computedArea : 145;
+    const [lat, lng] = mapCenter;
+    await fetchGisData(lat, lng);
     updateWizardData({
       roofArea: finalArea,
       polygonPoints,
@@ -91,27 +166,60 @@ export default function Step1FindHouse({ wizardData, updateWizardData, onNext })
 
   return (
     <div className="space-y-6 animate-fade-in text-left">
-      <div className="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-extrabold text-white flex items-center gap-2">
-            <MapPin className="w-5 h-5 text-sky-400" />
-            <span>Step 1: Locate House & Trace Roof Polygon</span>
-          </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Click anywhere on the satellite map canvas to add vertex points and outline your rooftop catchment surface.
-          </p>
+      <div className="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-extrabold text-white flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-sky-400" />
+              <span>Step 1: Locate House & Trace Roof Polygon</span>
+            </h2>
+            <p className="text-xs text-slate-400 mt-1">
+              Search manually, use live GPS, or select preset cities to center the map.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {presetLocations.map((loc) => (
+              <button
+                key={loc.name}
+                onClick={() => handleSelectPreset(loc)}
+                className="px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-xs font-semibold text-sky-300 border border-slate-700 transition-colors cursor-pointer"
+              >
+                {loc.name}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {presetLocations.map((loc) => (
+        {/* Input Bar: Manual Search + GPS Button */}
+        <div className="flex flex-col sm:flex-row items-center gap-3 pt-2 border-t border-slate-800/80">
+          <form onSubmit={handleSearchSubmit} className="flex-1 flex items-center gap-2 w-full">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                placeholder="Search location manually (e.g. Malviya Nagar, Jaipur)..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 pl-9 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-400"
+              />
+              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+            </div>
             <button
-              key={loc.name}
-              onClick={() => handleSelectPreset(loc)}
-              className="px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-xs font-semibold text-sky-300 border border-slate-700 transition-colors cursor-pointer"
+              type="submit"
+              disabled={isSearching}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sky-300 font-semibold text-xs rounded-xl cursor-pointer disabled:opacity-50"
             >
-              {loc.name}
+              {isSearching ? 'Searching...' : 'Search'}
             </button>
-          ))}
+          </form>
+
+          <button
+            onClick={handleUseGPS}
+            className="w-full sm:w-auto px-4 py-2 bg-sky-950/60 hover:bg-sky-900/60 border border-sky-500/30 text-sky-300 text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer shrink-0"
+          >
+            <Navigation className="w-3.5 h-3.5 text-sky-400" />
+            <span>Use My Location (GPS)</span>
+          </button>
         </div>
       </div>
 
@@ -219,9 +327,10 @@ export default function Step1FindHouse({ wizardData, updateWizardData, onNext })
 
           <button
             onClick={handleConfirmNext}
-            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-sky-500 to-emerald-400 hover:from-sky-400 hover:to-emerald-300 text-slate-950 font-extrabold text-xs tracking-wider uppercase shadow-xl shadow-sky-500/20 transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2 cursor-pointer"
+            disabled={isGisLoading}
+            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-sky-500 to-emerald-400 hover:from-sky-400 hover:to-emerald-300 text-slate-950 font-extrabold text-xs tracking-wider uppercase shadow-xl shadow-sky-500/20 transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
           >
-            <span>Confirm Roof Area & Proceed</span>
+            <span>{isGisLoading ? 'Fetching GIS Data...' : 'Confirm Roof Area & Proceed'}</span>
             <ArrowRight className="w-4 h-4 stroke-[3]" />
           </button>
         </div>

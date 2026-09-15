@@ -1,23 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Download, TrendingUp, DollarSign, Sparkles, CheckCircle2, RefreshCw, X, ShieldCheck, Printer, Loader2 } from 'lucide-react';
+import { FileText, Download, Sparkles, CheckCircle2, RefreshCw, X, ShieldCheck, Printer, Loader2 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
 import confetti from 'canvas-confetti';
 import { calculateHydrology } from '../../utils/hydrologicalEngine';
 
 const API_BASE = 'http://localhost:3001';
 
-export default function Step4Report({ wizardData, token, onReset }) {
+export default function Step4Report({ wizardData = {}, token, onReset }) {
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [pdfError, setPdfError] = useState('');
 
-  const hydro = calculateHydrology(
-    wizardData.roofArea,
-    wizardData.rainfall,
-    wizardData.runoffCoeff,
-    wizardData.householdMembers,
-    wizardData.soilType
-  );
+  // Extract variables with fallback safety defaults
+  const area = wizardData.roofArea || 145;
+  const rainfall = wizardData.annualRainfall || wizardData.rainfall || 950;
+  const coeff = wizardData.runoffCoeff || 0.85;
+  const members = wizardData.householdMembers || 4;
+  const soil = wizardData.soilType || 'Loamy';
+
+  const hydro = calculateHydrology(area, rainfall, coeff, members, soil);
 
   // Trigger celebration confetti when landing on report
   useEffect(() => {
@@ -105,13 +106,18 @@ export default function Step4Report({ wizardData, token, onReset }) {
         </div>
       </div>
 
+      {pdfError && (
+        <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/40 text-xs text-amber-200">
+          {pdfError}
+        </div>
+      )}
 
       {/* KPI Cards Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="glass-card p-5 rounded-2xl border border-slate-800 relative overflow-hidden">
           <div className="text-[10px] text-slate-400 uppercase font-mono font-bold">Annual Harvest Potential</div>
           <div className="text-2xl font-extrabold text-white font-mono mt-1">
-            {hydro.annualHarvest.toLocaleString()} <span className="text-xs text-slate-400 font-sans font-normal">L/yr</span>
+            {(hydro.annualHarvest || 0).toLocaleString()} <span className="text-xs text-slate-400 font-sans font-normal">L/yr</span>
           </div>
           <div className="text-[10px] text-emerald-400 mt-2 font-medium">100% Catchment Efficiency</div>
         </div>
@@ -119,15 +125,15 @@ export default function Step4Report({ wizardData, token, onReset }) {
         <div className="glass-card p-5 rounded-2xl border border-slate-800 relative overflow-hidden">
           <div className="text-[10px] text-slate-400 uppercase font-mono font-bold">Annual Utility Bill Savings</div>
           <div className="text-2xl font-extrabold text-emerald-400 font-mono mt-1">
-            ₹ {hydro.financials.annualSavings.toLocaleString()}
+            ₹ {(hydro.financials?.annualSavings || 0).toLocaleString()}
           </div>
-          <div className="text-[10px] text-slate-400 mt-2 font-medium">Based on ₹ {hydro.financials.waterRatePerLiter}/L tanker rate</div>
+          <div className="text-[10px] text-slate-400 mt-2 font-medium">Based on ₹ {hydro.financials?.waterRatePerLiter || 0.15}/L tanker rate</div>
         </div>
 
         <div className="glass-card p-5 rounded-2xl border border-slate-800 relative overflow-hidden">
           <div className="text-[10px] text-slate-400 uppercase font-mono font-bold">System Payback Timeline</div>
           <div className="text-2xl font-extrabold text-sky-400 font-mono mt-1">
-            {hydro.financials.paybackYears} <span className="text-xs text-slate-400 font-sans font-normal">Years</span>
+            {hydro.financials?.paybackYears || 0} <span className="text-xs text-slate-400 font-sans font-normal">Years</span>
           </div>
           <div className="text-[10px] text-sky-400 mt-2 font-medium">ROI on Turnkey Setup</div>
         </div>
@@ -135,7 +141,7 @@ export default function Step4Report({ wizardData, token, onReset }) {
         <div className="glass-card p-5 rounded-2xl border border-slate-800 relative overflow-hidden">
           <div className="text-[10px] text-slate-400 uppercase font-mono font-bold">Water Self-Sufficiency</div>
           <div className="text-2xl font-extrabold text-amber-400 font-mono mt-1">
-            {hydro.selfSufficiencyPct}%
+            {hydro.selfSufficiencyPct || 0}%
           </div>
           <div className="text-[10px] text-amber-400 mt-2 font-medium">Annual Household Independence</div>
         </div>
@@ -143,7 +149,7 @@ export default function Step4Report({ wizardData, token, onReset }) {
 
       {/* Chart & AI Recommendations Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Recharts 12-Month Water Balance Chart (Member 3 Pipeline) */}
+        {/* Left: Recharts 12-Month Water Balance Chart */}
         <div className="lg:col-span-2 glass-card rounded-2xl p-6 border border-slate-800">
           <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
             <div>
@@ -159,7 +165,7 @@ export default function Step4Report({ wizardData, token, onReset }) {
 
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={hydro.monthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <BarChart data={hydro.monthlyData || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" />
                 <XAxis dataKey="month" stroke="#64748B" fontSize={11} />
                 <YAxis stroke="#64748B" fontSize={11} />
@@ -183,7 +189,7 @@ export default function Step4Report({ wizardData, token, onReset }) {
             </h3>
 
             <div className="space-y-3">
-              {hydro.aiRecommendations.map((rec, idx) => (
+              {(hydro.aiRecommendations || []).map((rec, idx) => (
                 <div key={idx} className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 text-xs text-slate-300 flex items-start gap-2.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                   <span className="leading-snug text-[11.5px]">{rec}</span>
@@ -243,11 +249,11 @@ export default function Step4Report({ wizardData, token, onReset }) {
                 </div>
                 <div>
                   <div className="text-slate-500 uppercase">Rooftop Catchment Area:</div>
-                  <div className="text-white">{hydro.annualHarvest.toLocaleString()} L/yr ({wizardData.roofArea || 145} m²)</div>
+                  <div className="text-white">{(hydro.annualHarvest || 0).toLocaleString()} L/yr ({wizardData.roofArea || 145} m²)</div>
                 </div>
                 <div>
                   <div className="text-slate-500 uppercase">System Sizing Specs:</div>
-                  <div className="text-white">{hydro.tankCapacity}L Poly Tank | {hydro.downpipeDiameter}</div>
+                  <div className="text-white">{hydro.tankCapacity || 0}L Poly Tank | {hydro.downpipeDiameter || '110 mm'}</div>
                 </div>
               </div>
 
@@ -277,7 +283,6 @@ export default function Step4Report({ wizardData, token, onReset }) {
                 <span>{isDownloadingPdf ? 'Generating PDF...' : 'Download Official PDF'}</span>
               </button>
             </div>
-
           </div>
         </div>
       )}
