@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, LogOut, UserCheck } from 'lucide-react';
+import { LogOut, UserCheck } from 'lucide-react';
 
 export default function Navbar({ onOpenAuth, onStartWizard, currentView, user, onLogout }) {
   return (
@@ -79,13 +79,6 @@ export default function Navbar({ onOpenAuth, onStartWizard, currentView, user, o
           </button>
         )}
 
-        <button
-          onClick={() => onStartWizard('wizard')}
-          className="group relative flex items-center gap-2 px-5 py-2 rounded-full bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs tracking-wide shadow-lg shadow-sky-500/30 transition-all transform hover:scale-105 cursor-pointer"
-        >
-          <span>Get started</span>
-          <ArrowRight className="w-3.5 h-3.5 stroke-[3] group-hover:translate-x-1 transition-transform" />
-        </button>
       </div>
     </nav>
   );
